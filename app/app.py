@@ -8,6 +8,8 @@ from PyQt5.QtCore import Qt, QTimer
 from components.RectangleSelector import RectangleSelector
 from components.ImageProcessor import ImageProcessor as IP
 
+IP.imshow_disable = True  # Disable imshow in ImageProcessor
+
 class ImageProcessingApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -60,92 +62,80 @@ class ImageProcessingApp(QMainWindow):
         self.setCentralWidget(central_widget)
         
     def create_parameter_controls(self, layout):
+        # Helper function to create sliders
+        def add_slider(parent_layout, label_text, min_val, max_val, default_val, 
+                       tick_interval=1, decimals=0):
+            # Create a horizontal layout for the label and value
+            label_layout = QHBoxLayout()
+            
+            # Create label with parameter name
+            label = QLabel(label_text)
+            label_layout.addWidget(label)
+            
+            # Create value label and add it to the right of the parameter name
+            display_value = default_val if decimals == 0 else default_val/10**decimals
+            value_label = QLabel(f"{display_value:.{decimals}f}")
+            value_label.setAlignment(Qt.AlignRight)
+            label_layout.addWidget(value_label)
+            
+            # Add the label layout to the parent layout
+            parent_layout.addLayout(label_layout)
+            
+            # Create and configure the slider
+            slider = QSlider(Qt.Horizontal)
+            slider.setMinimum(min_val)
+            slider.setMaximum(max_val)
+            slider.setValue(default_val)
+            slider.setTickPosition(QSlider.TicksBelow)
+            slider.setTickInterval(tick_interval)
+            slider.valueChanged.connect(self.auto_process)
+            
+            # Update value label when slider changes
+            def update_label(value):
+                display_value = value if decimals == 0 else value/10**decimals
+                value_label.setText(f"{display_value:.{decimals}f}")
+            
+            slider.valueChanged.connect(update_label)
+            
+            parent_layout.addWidget(slider)
+            return slider
                 
         # Adaptive Threshold parameters
         threshold_group = QGroupBox("Adaptive Threshold")
         threshold_layout = QVBoxLayout()
         
-        block_size_label = QLabel("Block Size (3-51):")
-        self.block_size_slider = QSlider(Qt.Horizontal)
-        self.block_size_slider.setMinimum(1)
-        self.block_size_slider.setMaximum(25)
-        self.block_size_slider.setValue(5)
-        self.block_size_slider.setTickPosition(QSlider.TicksBelow)
-        self.block_size_slider.setTickInterval(2)
-        self.block_size_slider.valueChanged.connect(self.auto_process)
+        self.block_size_slider = add_slider(threshold_layout, "Block Size:", 
+                                           1, 25, 5, tick_interval=2)
+        self.c_value_slider = add_slider(threshold_layout, "C Value:", 
+                                        0, 20, 2, tick_interval=1)
         
-        c_value_label = QLabel("C Value (0-20):")
-        self.c_value_slider = QSlider(Qt.Horizontal)
-        self.c_value_slider.setMinimum(0)
-        self.c_value_slider.setMaximum(20)
-        self.c_value_slider.setValue(2)
-        self.c_value_slider.setTickPosition(QSlider.TicksBelow)
-        self.c_value_slider.setTickInterval(1)
-        self.c_value_slider.valueChanged.connect(self.auto_process)
-        
-        threshold_layout.addWidget(block_size_label)
-        threshold_layout.addWidget(self.block_size_slider)
-        threshold_layout.addWidget(c_value_label)
-        threshold_layout.addWidget(self.c_value_slider)
         threshold_group.setLayout(threshold_layout)
         layout.addWidget(threshold_group)
+
+        # Gabor Filter parameters
+        gabor_group = QGroupBox("Gabor Filter")
+        gabor_layout = QVBoxLayout()
+
+        self.ksize_slider = add_slider(gabor_layout, "Kernel Size:", 
+                                      1, 15, 3, tick_interval=2)
+        self.sigma_slider = add_slider(gabor_layout, "Sigma:", 
+                                     1, 50, 10, tick_interval=5, decimals=1)
+        self.theta_slider = add_slider(gabor_layout, "Theta:", 
+                                      0, 180, 0, tick_interval=15)
+        self.lambda_slider = add_slider(gabor_layout, "Lambda:", 
+                                       5, 20, 10, tick_interval=1)
         
-        # Hough Transform parameters (threshold_sobel, threshold_hough, minLineLength, maxLineGap
-        hough_group = QGroupBox("Hough Transform")
-        hough_layout = QVBoxLayout()
+        gabor_group.setLayout(gabor_layout)
+        layout.addWidget(gabor_group)
 
-        # Sobel Threshold
-        sobel_label = QLabel("Sobel Threshold (0-255):")
-        self.sobel_slider = QSlider(Qt.Horizontal)
-        self.sobel_slider.setMinimum(0)
-        self.sobel_slider.setMaximum(255)
-        self.sobel_slider.setValue(100)
-        self.sobel_slider.setTickPosition(QSlider.TicksBelow)
-        self.sobel_slider.setTickInterval(10)
-        self.sobel_slider.valueChanged.connect(self.auto_process)
-
-        # Hough Threshold
-        hough_label = QLabel("Hough Threshold (1-200):")
-        self.hough_slider = QSlider(Qt.Horizontal)
-        self.hough_slider.setMinimum(1)
-        self.hough_slider.setMaximum(200)
-        self.hough_slider.setValue(50)
-        self.hough_slider.setTickPosition(QSlider.TicksBelow)
-        self.hough_slider.setTickInterval(10)
-        self.hough_slider.valueChanged.connect(self.auto_process)
-
-        # Minimum Line Length
-        min_line_length_label = QLabel("Min Line Length (1-500):")
-        self.min_line_length_slider = QSlider(Qt.Horizontal)
-        self.min_line_length_slider.setMinimum(1)
-        self.min_line_length_slider.setMaximum(500)
-        self.min_line_length_slider.setValue(50)
-        self.min_line_length_slider.setTickPosition(QSlider.TicksBelow)
-        self.min_line_length_slider.setTickInterval(10)
-        self.min_line_length_slider.valueChanged.connect(self.auto_process)
-
-        # Maximum Line Gap
-        max_line_gap_label = QLabel("Max Line Gap (1-100):")
-        self.max_line_gap_slider = QSlider(Qt.Horizontal)
-        self.max_line_gap_slider.setMinimum(1)
-        self.max_line_gap_slider.setMaximum(100)
-        self.max_line_gap_slider.setValue(10)
-        self.max_line_gap_slider.setTickPosition(QSlider.TicksBelow)
-        self.max_line_gap_slider.setTickInterval(5)
-        self.max_line_gap_slider.valueChanged.connect(self.auto_process)
-
-        # Add widgets to layout
-        hough_layout.addWidget(sobel_label)
-        hough_layout.addWidget(self.sobel_slider)
-        hough_layout.addWidget(hough_label)
-        hough_layout.addWidget(self.hough_slider)
-        hough_layout.addWidget(min_line_length_label)
-        hough_layout.addWidget(self.min_line_length_slider)
-        hough_layout.addWidget(max_line_gap_label)
-        hough_layout.addWidget(self.max_line_gap_slider)
-        hough_group.setLayout(hough_layout)
-        layout.addWidget(hough_group)
-
+        # Add blur parameters
+        blur_group = QGroupBox("Blur")
+        blur_layout = QVBoxLayout()
+        self.blur_ksize_slider = add_slider(blur_layout, "Kernel Size:",
+                                           1, 35, 15, tick_interval=2)
+        
+        blur_group.setLayout(blur_layout)
+        layout.addWidget(blur_group)
 
     def import_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.tif)")
@@ -197,10 +187,11 @@ class ImageProcessingApp(QMainWindow):
         # Get parameters from sliders
         block_size = self.block_size_slider.value() * 2 + 1  # Make sure it's odd
         c_value = self.c_value_slider.value()
-        threshold_sobel = self.sobel_slider.value()
-        threshold_hough = self.hough_slider.value()
-        minLineLength = self.min_line_length_slider.value()
-        maxLineGap = self.max_line_gap_slider.value()
+        gabor_ksize = self.ksize_slider.value() * 2 + 1
+        sigma = self.sigma_slider.value() / 10.0
+        theta = self.theta_slider.value()
+        lambd = self.lambda_slider.value()
+        blur_ksize = self.blur_ksize_slider.value() * 2 + 1
 
         x, y, w, h = rect_coords
         cropped_image = self.image[y:y+h, x:x+w]
@@ -210,10 +201,11 @@ class ImageProcessingApp(QMainWindow):
             IP.process(cropped_image, 
                 block_size=block_size, 
                 c_value=c_value,
-                threshold_sobel=threshold_sobel,
-                threshold_hough=threshold_hough,
-                minLineLength=minLineLength,
-                maxLineGap=maxLineGap
+                gabor_ksize=gabor_ksize,
+                sigma=sigma,
+                theta=theta,
+                lambd=lambd,
+                blur_ksize=blur_ksize,
             )
         
 
