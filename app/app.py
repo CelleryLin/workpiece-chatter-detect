@@ -1,5 +1,4 @@
 import sys
-import os
 import cv2
 import numpy as np
 from PyQt5.QtWidgets import *
@@ -26,6 +25,8 @@ class ImageProcessingApp(QMainWindow):
         self.focus_mask = None
         self.focus_image = None
         self.contours = None
+
+        self.circle_real_area = 6*6*np.pi  # mm^2
         
         # Create the main layout
         main_layout = QHBoxLayout()
@@ -38,6 +39,11 @@ class ImageProcessingApp(QMainWindow):
         self.import_btn.clicked.connect(self.import_image)
         left_panel.addWidget(self.import_btn)
         
+        # display the Chattering Area
+        self.true_area_label = QLabel("Chattering Area: N/A")
+        self.true_area_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        left_panel.addWidget(self.true_area_label)
+
         # Processing parameters
         self.create_parameter_controls(left_panel)
         
@@ -106,8 +112,6 @@ class ImageProcessingApp(QMainWindow):
         
         self.block_size_slider = add_slider(threshold_layout, "Block Size:", 
                                            1, 25, 5, tick_interval=2)
-        self.c_value_slider = add_slider(threshold_layout, "C Value:", 
-                                        0, 20, 2, tick_interval=1)
         
         threshold_group.setLayout(threshold_layout)
         layout.addWidget(threshold_group)
@@ -118,8 +122,6 @@ class ImageProcessingApp(QMainWindow):
 
         self.ksize_slider = add_slider(gabor_layout, "Kernel Size:", 
                                       1, 15, 3, tick_interval=2)
-        self.sigma_slider = add_slider(gabor_layout, "Sigma:", 
-                                     1, 50, 10, tick_interval=5, decimals=1)
         self.theta_slider = add_slider(gabor_layout, "Theta:", 
                                       0, 180, 0, tick_interval=15)
         self.lambda_slider = add_slider(gabor_layout, "Lambda:", 
@@ -167,52 +169,80 @@ class ImageProcessingApp(QMainWindow):
         self.image_display.setPixmap(pixmap.scaled(
             self.image_display.width(), self.image_display.height(),
             Qt.KeepAspectRatio, Qt.SmoothTransformation))
+    
+    def calculate_true_area(self):
+        if self.f_area is not None and self.c_area is not None:
+            true_area = (self.f_area * self.circle_real_area) / self.c_area
+            self.true_area_label.setText(f"Chattering Area: {true_area:.2f} mm^2")
+            return true_area
+        else:
+            self.true_area_label.setText("Chattering Area: N/A")
+            return None
 
     def auto_process(self):
-        # Wrapper method to trigger process_image with a slight delay to prevent multiple rapid calls
         if self.image is not None:
-            # Use QTimer to prevent multiple rapid calls when multiple sliders are moved
             QTimer.singleShot(100, self.process_image)
 
     def process_image(self):
         if self.image is None:
             return
-            
+        
+        self.processed_image = self.image.copy()
+
+        self.f_area = None
+        self.c_area = None
+        
         # Get rectangle coordinates
         rect_coords = self.image_display.get_rectangle_coordinates(self.image_raw_h, self.image_raw_w)
-        if rect_coords is None:
+        if rect_coords is not None:
+            # Get parameters from sliders
+            block_size = self.block_size_slider.value() * 2 + 1  # Make sure it's odd
+            gabor_ksize = self.ksize_slider.value() * 2 + 1
+            theta = self.theta_slider.value()
+            lambd = self.lambda_slider.value()
+            blur_ksize = self.blur_ksize_slider.value() * 2 + 1
+
+            x, y, w, h = rect_coords
+            cropped_image = self.image[y:y+h, x:x+w]
+
+            # Process the cropped image
+            max_contours = \
+                IP.process(cropped_image, 
+                    block_size=block_size, 
+                    gabor_ksize=gabor_ksize,
+                    theta=theta,
+                    lambd=lambd,
+                    blur_ksize=blur_ksize,
+                )
+
+            if max_contours is not None:
+                processed_image_ = cropped_image.copy()
+                cv2.drawContours(processed_image_, [max_contours], -1, (255, 0, 0), 3)
+                self.f_area = cv2.contourArea(max_contours)
+                self.processed_image[y:y+h, x:x+w] = processed_image_
+                cx, cy, cw, ch = cv2.boundingRect(max_contours)
+                text = f"Area: {int(self.f_area)} px"
+                cv2.putText(self.processed_image, text, (int(x + cx + 0.2*cw), y + cy),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        
+        else:
             print("No region selected")
-            return
         
-        # Get parameters from sliders
-        block_size = self.block_size_slider.value() * 2 + 1  # Make sure it's odd
-        c_value = self.c_value_slider.value()
-        gabor_ksize = self.ksize_slider.value() * 2 + 1
-        sigma = self.sigma_slider.value() / 10.0
-        theta = self.theta_slider.value()
-        lambd = self.lambda_slider.value()
-        blur_ksize = self.blur_ksize_slider.value() * 2 + 1
+        # Find circle
+        circles = IP.detect_circles(self.image)
+        if circles is not None:
+            for (x, y, r) in circles:
+                x, y, r = int(x), int(y), int(r)
+                cv2.circle(self.processed_image, (x, y), r, (0, 255, 0), 2)
+                cv2.circle(self.processed_image, (x, y), 2, (0, 255, 0), 3)
 
-        x, y, w, h = rect_coords
-        cropped_image = self.image[y:y+h, x:x+w]
-
-        # Process the cropped image
-        cropped_processed_image = \
-            IP.process(cropped_image, 
-                block_size=block_size, 
-                c_value=c_value,
-                gabor_ksize=gabor_ksize,
-                sigma=sigma,
-                theta=theta,
-                lambd=lambd,
-                blur_ksize=blur_ksize,
-            )
-        
-
-        self.processed_image = self.image.copy()
-        self.processed_image[y:y+h, x:x+w] = cropped_processed_image
-        
-        # Display the processed image
+                # write the area (px) of the circle at the left top corner of the circle
+                self.c_area = np.pi * r**2
+                text = f"Area: {int(self.c_area)} px"
+                cv2.putText(self.processed_image, text, (int(x + 0.8*r), int(y - 0.8*r)), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
+        self.calculate_true_area()
         self.display_image(self.processed_image)
 
 

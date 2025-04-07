@@ -1,7 +1,5 @@
 import cv2
 import numpy as np
-from scipy.signal import find_peaks
-import matplotlib.pyplot as plt
 
 class ImageProcessor:
 
@@ -18,10 +16,8 @@ class ImageProcessor:
         
         # Get parameters
         block_size = kwargs.get('block_size', 7) # binarize
-        c_value = kwargs.get('c_value', 0) # binarize
 
         gabor_ksize = kwargs.get('gabor_ksize', 5) # gabor
-        sigma = kwargs.get('sigma', 0.08) # gabor
         theta = kwargs.get('theta', 7) # gabor
         lambd = kwargs.get('lambd', 7) # gabor
 
@@ -31,50 +27,22 @@ class ImageProcessor:
 
         morph_times = kwargs.get('morph_times', 3) # morph
         morph_kernel_size = kwargs.get('morph_kernel_size', 5) # morph
-
         
         # Convert to grayscale
         p_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         # Apply binary threshold
         p_img = cv2.adaptiveThreshold(
-            p_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, block_size, c_value)
+            p_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, block_size, 0)
 
-        p_img = ImageProcessor.gabor_filter(p_img, ksize=gabor_ksize, sigma=sigma, theta=theta, lambd=lambd)
+        p_img = ImageProcessor.gabor_filter(p_img, ksize=gabor_ksize, sigma=0.1, theta=theta, lambd=lambd)
         p_img = ImageProcessor.blur(p_img, kernel_size=blur_ksize)
         p_img = ImageProcessor.post_binarize(p_img, threshold=post_binarize_th)
         p_img = ImageProcessor.morphological_transform(p_img, times=morph_times, kernel_size=morph_kernel_size)
         max_contours = ImageProcessor.find_max_region(p_img)
 
-        imgS = image.copy()
-        if max_contours is not None:
-            # Draw the largest contour on the original image
-            cv2.drawContours(imgS, [max_contours], -1, (255, 0, 0), 3)
-
-
-        return imgS
+        return max_contours
     
-    @staticmethod
-    def sobel_edge_detect(img, ksize=3, threshold=None):
-        sobel_x = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=ksize)
-        sobel_y = cv2.Sobel(img, cv2.CV_64F, 0, 1, ksize=ksize)
-        p_img = np.sqrt(sobel_x**2 + sobel_y**2)
-        p_img = np.uint8(255 * p_img / np.max(p_img))
-
-        if threshold is not None:
-            p_img = cv2.threshold(p_img, threshold, 255, cv2.THRESH_BINARY)[1]
-
-        return p_img
-    
-    @staticmethod
-    def hough_line_detect(img, threshold_sobel=100, threshold_hough=100, minLineLength=50, maxLineGap=10):
-        # resize image for better performance
-        p_img = cv2.resize(img, (0, 0), fx=2, fy=2, interpolation=cv2.INTER_NEAREST)
-        p_img = ImageProcessor.sobel_edge_detect(p_img, ksize=3, threshold=threshold_sobel)
-        ImageProcessor.scalable_imshow(p_img, scale=0.5, msg="Sobel Edge Detection")
-        lines = cv2.HoughLinesP(p_img, 1, np.pi/180, threshold_hough, minLineLength, maxLineGap)
-        return lines
-
     @staticmethod
     def gabor_filter(img, ksize=3, sigma=1.0, theta=0, gamma=0.4, lambd=10.0):
         kernel = cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, 0, ktype=cv2.CV_32F)
