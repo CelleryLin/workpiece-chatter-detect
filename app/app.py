@@ -146,6 +146,76 @@ class ImageProcessingApp(QMainWindow):
         hough_group.setLayout(hough_layout)
         layout.addWidget(hough_group)
 
+        self._setup_circle_detection_controls(layout)
+
+    def _setup_circle_detection_controls(self, layout):
+        # Circle Detection parameters
+        circle_group = QGroupBox("Circle Detection")
+        circle_layout = QVBoxLayout()
+
+        # Min Radius
+        min_radius_label = QLabel("Min Radius (10-200):")
+        self.min_radius_slider = QSlider(Qt.Horizontal)
+        self.min_radius_slider.setMinimum(10)
+        self.min_radius_slider.setMaximum(200)
+        self.min_radius_slider.setValue(50)
+        self.min_radius_slider.setTickPosition(QSlider.TicksBelow)
+        self.min_radius_slider.setTickInterval(20)
+        self.min_radius_slider.valueChanged.connect(self.auto_process)
+
+        # Max Radius
+        max_radius_label = QLabel("Max Radius (50-500):")
+        self.max_radius_slider = QSlider(Qt.Horizontal)
+        self.max_radius_slider.setMinimum(50)
+        self.max_radius_slider.setMaximum(500)
+        self.max_radius_slider.setValue(300)
+        self.max_radius_slider.setTickPosition(QSlider.TicksBelow)
+        self.max_radius_slider.setTickInterval(50)
+        self.max_radius_slider.valueChanged.connect(self.auto_process)
+
+        # Param1 (edge detection threshold)
+        param1_label = QLabel("Param1 - Edge Threshold (10-200):")
+        self.param1_slider = QSlider(Qt.Horizontal)
+        self.param1_slider.setMinimum(10)
+        self.param1_slider.setMaximum(200)
+        self.param1_slider.setValue(100)
+        self.param1_slider.setTickPosition(QSlider.TicksBelow)
+        self.param1_slider.setTickInterval(20)
+        self.param1_slider.valueChanged.connect(self.auto_process)
+
+        # Param2 (circle detection threshold)
+        param2_label = QLabel("Param2 - Circle Threshold (10-200):")
+        self.param2_slider = QSlider(Qt.Horizontal)
+        self.param2_slider.setMinimum(10)
+        self.param2_slider.setMaximum(200)
+        self.param2_slider.setValue(75)
+        self.param2_slider.setTickPosition(QSlider.TicksBelow)
+        self.param2_slider.setTickInterval(20)
+        self.param2_slider.valueChanged.connect(self.auto_process)
+
+        # DP (resolution ratio)
+        dp_label = QLabel("DP - Resolution Ratio (1-10):")
+        self.dp_slider = QSlider(Qt.Horizontal)
+        self.dp_slider.setMinimum(1)
+        self.dp_slider.setMaximum(10)
+        self.dp_slider.setValue(1)
+        self.dp_slider.setTickPosition(QSlider.TicksBelow)
+        self.dp_slider.setTickInterval(1)
+        self.dp_slider.valueChanged.connect(self.auto_process)
+
+        # Add widgets to layout
+        circle_layout.addWidget(min_radius_label)
+        circle_layout.addWidget(self.min_radius_slider)
+        circle_layout.addWidget(max_radius_label)
+        circle_layout.addWidget(self.max_radius_slider)
+        # circle_layout.addWidget(param1_label)
+        # circle_layout.addWidget(self.param1_slider)
+        circle_layout.addWidget(param2_label)
+        circle_layout.addWidget(self.param2_slider)
+        # circle_layout.addWidget(dp_label)
+        # circle_layout.addWidget(self.dp_slider)
+        circle_group.setLayout(circle_layout)
+        layout.addWidget(circle_group)
 
     def import_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.tif)")
@@ -216,6 +286,19 @@ class ImageProcessingApp(QMainWindow):
                 maxLineGap=maxLineGap
             )
         
+        detected_circles = IP.detect_circles(
+            self.image[y:y+h, x:x+w],
+            dp=self.dp_slider.value(),
+            minRadius=self.min_radius_slider.value(),
+            maxRadius=self.max_radius_slider.value(),
+            param1=self.param1_slider.value(),
+            param2=self.param2_slider.value()
+        )
+        # Draw detected circles on the processed image
+        print(detected_circles)
+        if detected_circles is not None:
+            for (cx, cy, r) in detected_circles:
+                cv2.circle(cropped_processed_image, (int(cx), int(cy)), int(r), (0, 255, 0), 10)
 
         self.processed_image = self.image.copy()
         self.processed_image[y:y+h, x:x+w] = cropped_processed_image
