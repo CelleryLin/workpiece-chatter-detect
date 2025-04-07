@@ -95,16 +95,22 @@ class ImageProcessor:
         cv2.destroyAllWindows()
     
     @staticmethod
-    def detect_circles(img: np.ndarray):
+    def detect_circles(
+        img: np.ndarray, 
+        minRadius: int = 50,
+        maxRadius: int = 300,
+        param1: int = 100,
+        param2: int = 75,
+        dp: int = 1,
+    ):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (9, 9), 2)
-        edges = cv2.Canny(gray, 50, 150)
+        gray = cv2.equalizeHist(gray)
+        gray = cv2.medianBlur(gray, 11)
+        edges = cv2.Canny(gray, 75, 150, apertureSize=3)
 
-        minRadius = 50
-        maxRadius = 300
         circles = cv2.HoughCircles(
-            image=edges, method=cv2.HOUGH_GRADIENT, dp=1, minDist=2*minRadius, param1=100, 
-            param2=100,minRadius=minRadius, maxRadius=maxRadius
+            image=edges, method=cv2.HOUGH_GRADIENT, dp=dp, minDist=2*minRadius, param1=param1, 
+            param2=param2,minRadius=minRadius, maxRadius=maxRadius
         )
 
         if circles is None:
