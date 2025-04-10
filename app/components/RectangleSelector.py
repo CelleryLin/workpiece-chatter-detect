@@ -16,7 +16,6 @@ class RectangleSelector(QLabel):
         if event.button() == Qt.LeftButton:
             self.start_point = event.pos()
             self.end_point = event.pos()
-            print(self.start_point)
             self.drawing = True
             self.selection_rect = QRect(self.start_point, self.end_point)
             self.update()
@@ -54,10 +53,6 @@ class RectangleSelector(QLabel):
             
         pixmap_rect = self.pixmap().rect()
         label_rect = self.rect()
-
-        print(pixmap_rect.width(), label_rect.width())
-        print(pixmap_rect.height(), label_rect.height())
-
         view_width = pixmap_rect.width()
         view_height = pixmap_rect.height()
         x_scale = raw_w / view_width
@@ -69,4 +64,14 @@ class RectangleSelector(QLabel):
         y = int((self.selection_rect.y() - y_shift) * y_scale)
         width = int(self.selection_rect.width() * x_scale)
         height = int(self.selection_rect.height() * y_scale)
+
+        # Ensure the coordinates are within bounds
+        x = max(0, min(x, raw_w - 1))
+        y = max(0, min(y, raw_h - 1))
+        width = max(1, min(width, raw_w - x))
+        height = max(1, min(height, raw_h - y))
+        # Ensure width and height are positive
+        width = abs(width)
+        height = abs(height)
+
         return x, y, width, height

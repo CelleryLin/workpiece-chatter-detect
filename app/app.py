@@ -253,6 +253,7 @@ class ImageProcessingApp(QMainWindow):
             maxRadius=self.circle_max_radius_slider.value(),
             param2=self.circle_param2_slider.value()
         )
+        
         if circles is not None:
             for (x, y, r) in circles:
                 x, y, r = int(x), int(y), int(r)
