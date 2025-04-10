@@ -139,6 +139,24 @@ class ImageProcessingApp(QMainWindow):
         blur_group.setLayout(blur_layout)
         layout.addWidget(blur_group)
 
+        # Add circle detection parameters
+        circle_detection_group = QGroupBox("Circle Detection")
+        circle_detection_layout = QVBoxLayout()
+        self.circle_min_radius_slider = add_slider(
+            circle_detection_layout, "Minimum Circle Radius:", 
+            1, 500, 50, tick_interval=10
+        )
+        self.circle_max_radius_slider = add_slider(
+            circle_detection_layout, "Maximum Circle Radius:",
+            1, 500, 300, tick_interval=10
+        )
+        self.circle_param2_slider = add_slider(
+            circle_detection_layout, "Detection Threshold:",
+            1, 300, 100, tick_interval=10
+        )
+        circle_detection_group.setLayout(circle_detection_layout)
+        layout.addWidget(circle_detection_group)
+
     def import_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.tif)")
         if file_path:
@@ -229,7 +247,13 @@ class ImageProcessingApp(QMainWindow):
             print("No region selected")
         
         # Find circle
-        circles = IP.detect_circles(self.image)
+        circles = IP.detect_circles(
+            self.image, 
+            minRadius=self.circle_min_radius_slider.value(),
+            maxRadius=self.circle_max_radius_slider.value(),
+            param2=self.circle_param2_slider.value()
+        )
+        
         if circles is not None:
             for (x, y, r) in circles:
                 x, y, r = int(x), int(y), int(r)
