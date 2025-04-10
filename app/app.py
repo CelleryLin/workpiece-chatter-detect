@@ -139,107 +139,23 @@ class ImageProcessingApp(QMainWindow):
         blur_group.setLayout(blur_layout)
         layout.addWidget(blur_group)
 
-        circle_layout = self._setup_circle_detection_panel()
-        layout.addWidget(circle_layout)
-
-    def _setup_circle_detection_panel(self):   
-        # Create a group box for circle detection parameters
-        circle_group = QGroupBox("Circle Detection")
-        circle_layout = QVBoxLayout()
-
-        # Add sliders for circle detection parameters
-        # Create a horizontal layout for the label and value display
-        min_radius_layout = QHBoxLayout()
-        min_radius_label = QLabel("Minimum Circle Radius:")
-        min_radius_layout.addWidget(min_radius_label)
-        
-        # Value label aligned to the right
-        self.min_radius_value_label = QLabel("50")
-        self.min_radius_value_label.setAlignment(Qt.AlignRight)
-        min_radius_layout.addWidget(self.min_radius_value_label)
-        # Add the label layout to the parent layout
-        circle_layout.addLayout(min_radius_layout)
-        # Create and configure the slider
-        self.circle_min_radius_slider = QSlider(Qt.Horizontal)
-        self.circle_min_radius_slider.setMinimum(1)
-        self.circle_min_radius_slider.setMaximum(300)
-        self.circle_min_radius_slider.setValue(50)
-        self.circle_min_radius_slider.setTickPosition(QSlider.TicksBelow)
-        self.circle_min_radius_slider.setTickInterval(10)
-        self.circle_min_radius_slider.setSingleStep(1)
-        self.circle_min_radius_slider.setPageStep(10)
-        self.circle_min_radius_slider.setToolTip("Minimum Circle Radius")
-        # Update the value label when slider changes
-        def update_min_radius_label(value):
-            self.min_radius_value_label.setText(str(value))
-        self.circle_min_radius_slider.valueChanged.connect(update_min_radius_label)
-        self.circle_min_radius_slider.valueChanged.connect(self.auto_process)
-        circle_layout.addWidget(self.circle_min_radius_slider)
-
-
-        # Add max radius slider with label and value display
-        max_radius_layout = QHBoxLayout()
-        max_radius_label = QLabel("Maximum Circle Radius:")
-        max_radius_layout.addWidget(max_radius_label)  
-        # Value label aligned to the right
-        self.max_radius_value_label = QLabel("300")
-        self.max_radius_value_label.setAlignment(Qt.AlignRight)
-        max_radius_layout.addWidget(self.max_radius_value_label)
-        # Add the label layout to the parent layout
-        circle_layout.addLayout(max_radius_layout)
-        # Create and configure the slider
-        self.circle_max_radius_slider = QSlider(Qt.Horizontal)
-        self.circle_max_radius_slider.setMinimum(1)
-        self.circle_max_radius_slider.setMaximum(500)
-        self.circle_max_radius_slider.setValue(300)
-        self.circle_max_radius_slider.setTickPosition(QSlider.TicksBelow)
-        self.circle_max_radius_slider.setTickInterval(10)
-        self.circle_max_radius_slider.setSingleStep(1)
-        self.circle_max_radius_slider.setPageStep(10)
-        self.circle_max_radius_slider.setToolTip("Maximum Circle Radius")
-        # Update the value label when slider changes
-        def update_max_radius_label(value):
-            self.max_radius_value_label.setText(str(value))
-        self.circle_max_radius_slider.valueChanged.connect(update_max_radius_label)
-        self.circle_max_radius_slider.valueChanged.connect(self.auto_process)
-        circle_layout.addWidget(self.circle_max_radius_slider)
-
-        # Add param2 slider with label and value display
-        param2_layout = QHBoxLayout()
-        param2_label = QLabel("Detection Threshold:")
-        param2_layout.addWidget(param2_label)
-
-        # Value label aligned to the right
-        self.param2_value_label = QLabel("50")
-        self.param2_value_label.setAlignment(Qt.AlignRight)
-        param2_layout.addWidget(self.param2_value_label)
-        # Add the label layout to the parent layout
-        circle_layout.addLayout(param2_layout)
-
-        # Create and configure the slider
-        self.circle_param2_slider = QSlider(Qt.Horizontal)
-        self.circle_param2_slider.setMinimum(1)
-        self.circle_param2_slider.setMaximum(300)
-        self.circle_param2_slider.setValue(100)
-        self.circle_param2_slider.setTickPosition(QSlider.TicksBelow)
-        self.circle_param2_slider.setTickInterval(10)
-        self.circle_param2_slider.setSingleStep(1)
-        self.circle_param2_slider.setPageStep(5)
-        self.circle_param2_slider.setToolTip("Param2: Edge detection sensitivity (lower is more sensitive)")
-
-        # Update the value label when slider changes
-        def update_param2_label(value):
-            self.param2_value_label.setText(str(value))
-        self.circle_param2_slider.valueChanged.connect(update_param2_label)
-        self.circle_param2_slider.valueChanged.connect(self.auto_process)
-        circle_layout.addWidget(self.circle_param2_slider)
-
-
-        # Set layout for the group box
-        circle_group.setLayout(circle_layout)
-        
-        return circle_group
-
+        # Add circle detection parameters
+        circle_detection_group = QGroupBox("Circle Detection")
+        circle_detection_layout = QVBoxLayout()
+        self.circle_min_radius_slider = add_slider(
+            circle_detection_layout, "Minimum Circle Radius:", 
+            1, 500, 50, tick_interval=10
+        )
+        self.circle_max_radius_slider = add_slider(
+            circle_detection_layout, "Maximum Circle Radius:",
+            1, 500, 300, tick_interval=10
+        )
+        self.circle_param2_slider = add_slider(
+            circle_detection_layout, "Detection Threshold:",
+            1, 300, 100, tick_interval=10
+        )
+        circle_detection_group.setLayout(circle_detection_layout)
+        layout.addWidget(circle_detection_group)
 
     def import_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.tif)")
