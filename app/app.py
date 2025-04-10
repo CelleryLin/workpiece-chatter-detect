@@ -1,5 +1,4 @@
 import sys
-import os
 import cv2
 import numpy as np
 from PyQt5.QtWidgets import *
@@ -7,6 +6,8 @@ from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt, QTimer
 from components.RectangleSelector import RectangleSelector
 from components.ImageProcessor import ImageProcessor as IP
+
+IP.imshow_disable = True  # Disable imshow in ImageProcessor
 
 class ImageProcessingApp(QMainWindow):
     def __init__(self):
@@ -24,6 +25,8 @@ class ImageProcessingApp(QMainWindow):
         self.focus_mask = None
         self.focus_image = None
         self.contours = None
+
+        self.circle_real_area = 6*6*np.pi  # mm^2
         
         # Create the main layout
         main_layout = QHBoxLayout()
@@ -36,6 +39,11 @@ class ImageProcessingApp(QMainWindow):
         self.import_btn.clicked.connect(self.import_image)
         left_panel.addWidget(self.import_btn)
         
+        # display the Chattering Area
+        self.true_area_label = QLabel("Chattering Area: N/A")
+        self.true_area_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        left_panel.addWidget(self.true_area_label)
+
         # Processing parameters
         self.create_parameter_controls(left_panel)
         
@@ -60,162 +68,178 @@ class ImageProcessingApp(QMainWindow):
         self.setCentralWidget(central_widget)
         
     def create_parameter_controls(self, layout):
+        # Helper function to create sliders
+        def add_slider(parent_layout, label_text, min_val, max_val, default_val, 
+                       tick_interval=1, decimals=0):
+            # Create a horizontal layout for the label and value
+            label_layout = QHBoxLayout()
+            
+            # Create label with parameter name
+            label = QLabel(label_text)
+            label_layout.addWidget(label)
+            
+            # Create value label and add it to the right of the parameter name
+            display_value = default_val if decimals == 0 else default_val/10**decimals
+            value_label = QLabel(f"{display_value:.{decimals}f}")
+            value_label.setAlignment(Qt.AlignRight)
+            label_layout.addWidget(value_label)
+            
+            # Add the label layout to the parent layout
+            parent_layout.addLayout(label_layout)
+            
+            # Create and configure the slider
+            slider = QSlider(Qt.Horizontal)
+            slider.setMinimum(min_val)
+            slider.setMaximum(max_val)
+            slider.setValue(default_val)
+            slider.setTickPosition(QSlider.TicksBelow)
+            slider.setTickInterval(tick_interval)
+            slider.valueChanged.connect(self.auto_process)
+            
+            # Update value label when slider changes
+            def update_label(value):
+                display_value = value if decimals == 0 else value/10**decimals
+                value_label.setText(f"{display_value:.{decimals}f}")
+            
+            slider.valueChanged.connect(update_label)
+            
+            parent_layout.addWidget(slider)
+            return slider
                 
         # Adaptive Threshold parameters
         threshold_group = QGroupBox("Adaptive Threshold")
         threshold_layout = QVBoxLayout()
         
-        block_size_label = QLabel("Block Size (3-51):")
-        self.block_size_slider = QSlider(Qt.Horizontal)
-        self.block_size_slider.setMinimum(1)
-        self.block_size_slider.setMaximum(25)
-        self.block_size_slider.setValue(5)
-        self.block_size_slider.setTickPosition(QSlider.TicksBelow)
-        self.block_size_slider.setTickInterval(2)
-        self.block_size_slider.valueChanged.connect(self.auto_process)
+        self.block_size_slider = add_slider(threshold_layout, "Block Size:", 
+                                           1, 25, 5, tick_interval=2)
         
-        c_value_label = QLabel("C Value (0-20):")
-        self.c_value_slider = QSlider(Qt.Horizontal)
-        self.c_value_slider.setMinimum(0)
-        self.c_value_slider.setMaximum(20)
-        self.c_value_slider.setValue(2)
-        self.c_value_slider.setTickPosition(QSlider.TicksBelow)
-        self.c_value_slider.setTickInterval(1)
-        self.c_value_slider.valueChanged.connect(self.auto_process)
-        
-        threshold_layout.addWidget(block_size_label)
-        threshold_layout.addWidget(self.block_size_slider)
-        threshold_layout.addWidget(c_value_label)
-        threshold_layout.addWidget(self.c_value_slider)
         threshold_group.setLayout(threshold_layout)
         layout.addWidget(threshold_group)
+
+        # Gabor Filter parameters
+        gabor_group = QGroupBox("Gabor Filter")
+        gabor_layout = QVBoxLayout()
+
+        self.ksize_slider = add_slider(gabor_layout, "Kernel Size:", 
+                                      1, 15, 3, tick_interval=2)
+        self.theta_slider = add_slider(gabor_layout, "Theta:", 
+                                      0, 180, 0, tick_interval=15)
+        self.lambda_slider = add_slider(gabor_layout, "Lambda:", 
+                                       5, 20, 10, tick_interval=1)
         
-        # Hough Transform parameters (threshold_sobel, threshold_hough, minLineLength, maxLineGap
-        hough_group = QGroupBox("Hough Transform")
-        hough_layout = QVBoxLayout()
+        gabor_group.setLayout(gabor_layout)
+        layout.addWidget(gabor_group)
 
-        # Sobel Threshold
-        sobel_label = QLabel("Sobel Threshold (0-255):")
-        self.sobel_slider = QSlider(Qt.Horizontal)
-        self.sobel_slider.setMinimum(0)
-        self.sobel_slider.setMaximum(255)
-        self.sobel_slider.setValue(100)
-        self.sobel_slider.setTickPosition(QSlider.TicksBelow)
-        self.sobel_slider.setTickInterval(10)
-        self.sobel_slider.valueChanged.connect(self.auto_process)
+        # Add blur parameters
+        blur_group = QGroupBox("Blur")
+        blur_layout = QVBoxLayout()
+        self.blur_ksize_slider = add_slider(blur_layout, "Kernel Size:",
+                                           1, 35, 15, tick_interval=2)
+        
+        blur_group.setLayout(blur_layout)
+        layout.addWidget(blur_group)
 
-        # Hough Threshold
-        hough_label = QLabel("Hough Threshold (1-200):")
-        self.hough_slider = QSlider(Qt.Horizontal)
-        self.hough_slider.setMinimum(1)
-        self.hough_slider.setMaximum(200)
-        self.hough_slider.setValue(50)
-        self.hough_slider.setTickPosition(QSlider.TicksBelow)
-        self.hough_slider.setTickInterval(10)
-        self.hough_slider.valueChanged.connect(self.auto_process)
+        circle_layout = self._setup_circle_detection_panel()
+        layout.addWidget(circle_layout)
 
-        # Minimum Line Length
-        min_line_length_label = QLabel("Min Line Length (1-500):")
-        self.min_line_length_slider = QSlider(Qt.Horizontal)
-        self.min_line_length_slider.setMinimum(1)
-        self.min_line_length_slider.setMaximum(500)
-        self.min_line_length_slider.setValue(50)
-        self.min_line_length_slider.setTickPosition(QSlider.TicksBelow)
-        self.min_line_length_slider.setTickInterval(10)
-        self.min_line_length_slider.valueChanged.connect(self.auto_process)
-
-        # Maximum Line Gap
-        max_line_gap_label = QLabel("Max Line Gap (1-100):")
-        self.max_line_gap_slider = QSlider(Qt.Horizontal)
-        self.max_line_gap_slider.setMinimum(1)
-        self.max_line_gap_slider.setMaximum(100)
-        self.max_line_gap_slider.setValue(10)
-        self.max_line_gap_slider.setTickPosition(QSlider.TicksBelow)
-        self.max_line_gap_slider.setTickInterval(5)
-        self.max_line_gap_slider.valueChanged.connect(self.auto_process)
-
-        # Add widgets to layout
-        hough_layout.addWidget(sobel_label)
-        hough_layout.addWidget(self.sobel_slider)
-        hough_layout.addWidget(hough_label)
-        hough_layout.addWidget(self.hough_slider)
-        hough_layout.addWidget(min_line_length_label)
-        hough_layout.addWidget(self.min_line_length_slider)
-        hough_layout.addWidget(max_line_gap_label)
-        hough_layout.addWidget(self.max_line_gap_slider)
-        hough_group.setLayout(hough_layout)
-        layout.addWidget(hough_group)
-
-        self._setup_circle_detection_controls(layout)
-
-    def _setup_circle_detection_controls(self, layout):
-        # Circle Detection parameters
+    def _setup_circle_detection_panel(self):   
+        # Create a group box for circle detection parameters
         circle_group = QGroupBox("Circle Detection")
         circle_layout = QVBoxLayout()
 
-        # Min Radius
-        min_radius_label = QLabel("Min Radius (10-200):")
-        self.min_radius_slider = QSlider(Qt.Horizontal)
-        self.min_radius_slider.setMinimum(10)
-        self.min_radius_slider.setMaximum(200)
-        self.min_radius_slider.setValue(50)
-        self.min_radius_slider.setTickPosition(QSlider.TicksBelow)
-        self.min_radius_slider.setTickInterval(20)
-        self.min_radius_slider.valueChanged.connect(self.auto_process)
+        # Add sliders for circle detection parameters
+        # Create a horizontal layout for the label and value display
+        min_radius_layout = QHBoxLayout()
+        min_radius_label = QLabel("Minimum Circle Radius:")
+        min_radius_layout.addWidget(min_radius_label)
+        
+        # Value label aligned to the right
+        self.min_radius_value_label = QLabel("50")
+        self.min_radius_value_label.setAlignment(Qt.AlignRight)
+        min_radius_layout.addWidget(self.min_radius_value_label)
+        # Add the label layout to the parent layout
+        circle_layout.addLayout(min_radius_layout)
+        # Create and configure the slider
+        self.circle_min_radius_slider = QSlider(Qt.Horizontal)
+        self.circle_min_radius_slider.setMinimum(1)
+        self.circle_min_radius_slider.setMaximum(300)
+        self.circle_min_radius_slider.setValue(50)
+        self.circle_min_radius_slider.setTickPosition(QSlider.TicksBelow)
+        self.circle_min_radius_slider.setTickInterval(10)
+        self.circle_min_radius_slider.setSingleStep(1)
+        self.circle_min_radius_slider.setPageStep(10)
+        self.circle_min_radius_slider.setToolTip("Minimum Circle Radius")
+        # Update the value label when slider changes
+        def update_min_radius_label(value):
+            self.min_radius_value_label.setText(str(value))
+        self.circle_min_radius_slider.valueChanged.connect(update_min_radius_label)
+        self.circle_min_radius_slider.valueChanged.connect(self.auto_process)
+        circle_layout.addWidget(self.circle_min_radius_slider)
 
-        # Max Radius
-        max_radius_label = QLabel("Max Radius (50-500):")
-        self.max_radius_slider = QSlider(Qt.Horizontal)
-        self.max_radius_slider.setMinimum(50)
-        self.max_radius_slider.setMaximum(500)
-        self.max_radius_slider.setValue(300)
-        self.max_radius_slider.setTickPosition(QSlider.TicksBelow)
-        self.max_radius_slider.setTickInterval(50)
-        self.max_radius_slider.valueChanged.connect(self.auto_process)
 
-        # Param1 (edge detection threshold)
-        param1_label = QLabel("Param1 - Edge Threshold (10-200):")
-        self.param1_slider = QSlider(Qt.Horizontal)
-        self.param1_slider.setMinimum(10)
-        self.param1_slider.setMaximum(200)
-        self.param1_slider.setValue(100)
-        self.param1_slider.setTickPosition(QSlider.TicksBelow)
-        self.param1_slider.setTickInterval(20)
-        self.param1_slider.valueChanged.connect(self.auto_process)
+        # Add max radius slider with label and value display
+        max_radius_layout = QHBoxLayout()
+        max_radius_label = QLabel("Maximum Circle Radius:")
+        max_radius_layout.addWidget(max_radius_label)  
+        # Value label aligned to the right
+        self.max_radius_value_label = QLabel("300")
+        self.max_radius_value_label.setAlignment(Qt.AlignRight)
+        max_radius_layout.addWidget(self.max_radius_value_label)
+        # Add the label layout to the parent layout
+        circle_layout.addLayout(max_radius_layout)
+        # Create and configure the slider
+        self.circle_max_radius_slider = QSlider(Qt.Horizontal)
+        self.circle_max_radius_slider.setMinimum(1)
+        self.circle_max_radius_slider.setMaximum(500)
+        self.circle_max_radius_slider.setValue(300)
+        self.circle_max_radius_slider.setTickPosition(QSlider.TicksBelow)
+        self.circle_max_radius_slider.setTickInterval(10)
+        self.circle_max_radius_slider.setSingleStep(1)
+        self.circle_max_radius_slider.setPageStep(10)
+        self.circle_max_radius_slider.setToolTip("Maximum Circle Radius")
+        # Update the value label when slider changes
+        def update_max_radius_label(value):
+            self.max_radius_value_label.setText(str(value))
+        self.circle_max_radius_slider.valueChanged.connect(update_max_radius_label)
+        self.circle_max_radius_slider.valueChanged.connect(self.auto_process)
+        circle_layout.addWidget(self.circle_max_radius_slider)
 
-        # Param2 (circle detection threshold)
-        param2_label = QLabel("Param2 - Circle Threshold (10-200):")
-        self.param2_slider = QSlider(Qt.Horizontal)
-        self.param2_slider.setMinimum(10)
-        self.param2_slider.setMaximum(200)
-        self.param2_slider.setValue(75)
-        self.param2_slider.setTickPosition(QSlider.TicksBelow)
-        self.param2_slider.setTickInterval(20)
-        self.param2_slider.valueChanged.connect(self.auto_process)
+        # Add param2 slider with label and value display
+        param2_layout = QHBoxLayout()
+        param2_label = QLabel("Detection Threshold:")
+        param2_layout.addWidget(param2_label)
 
-        # DP (resolution ratio)
-        dp_label = QLabel("DP - Resolution Ratio (1-10):")
-        self.dp_slider = QSlider(Qt.Horizontal)
-        self.dp_slider.setMinimum(1)
-        self.dp_slider.setMaximum(10)
-        self.dp_slider.setValue(1)
-        self.dp_slider.setTickPosition(QSlider.TicksBelow)
-        self.dp_slider.setTickInterval(1)
-        self.dp_slider.valueChanged.connect(self.auto_process)
+        # Value label aligned to the right
+        self.param2_value_label = QLabel("50")
+        self.param2_value_label.setAlignment(Qt.AlignRight)
+        param2_layout.addWidget(self.param2_value_label)
+        # Add the label layout to the parent layout
+        circle_layout.addLayout(param2_layout)
 
-        # Add widgets to layout
-        circle_layout.addWidget(min_radius_label)
-        circle_layout.addWidget(self.min_radius_slider)
-        circle_layout.addWidget(max_radius_label)
-        circle_layout.addWidget(self.max_radius_slider)
-        # circle_layout.addWidget(param1_label)
-        # circle_layout.addWidget(self.param1_slider)
-        circle_layout.addWidget(param2_label)
-        circle_layout.addWidget(self.param2_slider)
-        # circle_layout.addWidget(dp_label)
-        # circle_layout.addWidget(self.dp_slider)
+        # Create and configure the slider
+        self.circle_param2_slider = QSlider(Qt.Horizontal)
+        self.circle_param2_slider.setMinimum(1)
+        self.circle_param2_slider.setMaximum(300)
+        self.circle_param2_slider.setValue(100)
+        self.circle_param2_slider.setTickPosition(QSlider.TicksBelow)
+        self.circle_param2_slider.setTickInterval(10)
+        self.circle_param2_slider.setSingleStep(1)
+        self.circle_param2_slider.setPageStep(5)
+        self.circle_param2_slider.setToolTip("Param2: Edge detection sensitivity (lower is more sensitive)")
+
+        # Update the value label when slider changes
+        def update_param2_label(value):
+            self.param2_value_label.setText(str(value))
+        self.circle_param2_slider.valueChanged.connect(update_param2_label)
+        self.circle_param2_slider.valueChanged.connect(self.auto_process)
+        circle_layout.addWidget(self.circle_param2_slider)
+
+
+        # Set layout for the group box
         circle_group.setLayout(circle_layout)
-        layout.addWidget(circle_group)
+        
+        return circle_group
+
 
     def import_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.tif)")
@@ -247,63 +271,85 @@ class ImageProcessingApp(QMainWindow):
         self.image_display.setPixmap(pixmap.scaled(
             self.image_display.width(), self.image_display.height(),
             Qt.KeepAspectRatio, Qt.SmoothTransformation))
+    
+    def calculate_true_area(self):
+        if self.f_area is not None and self.c_area is not None:
+            true_area = (self.f_area * self.circle_real_area) / self.c_area
+            self.true_area_label.setText(f"Chattering Area: {true_area:.2f} mm^2")
+            return true_area
+        else:
+            self.true_area_label.setText("Chattering Area: N/A")
+            return None
 
     def auto_process(self):
-        # Wrapper method to trigger process_image with a slight delay to prevent multiple rapid calls
         if self.image is not None:
-            # Use QTimer to prevent multiple rapid calls when multiple sliders are moved
             QTimer.singleShot(100, self.process_image)
 
     def process_image(self):
         if self.image is None:
             return
-            
+        
+        self.processed_image = self.image.copy()
+
+        self.f_area = None
+        self.c_area = None
+        
         # Get rectangle coordinates
         rect_coords = self.image_display.get_rectangle_coordinates(self.image_raw_h, self.image_raw_w)
-        if rect_coords is None:
+        if rect_coords is not None:
+            # Get parameters from sliders
+            block_size = self.block_size_slider.value() * 2 + 1  # Make sure it's odd
+            gabor_ksize = self.ksize_slider.value() * 2 + 1
+            theta = self.theta_slider.value()
+            lambd = self.lambda_slider.value()
+            blur_ksize = self.blur_ksize_slider.value() * 2 + 1
+
+            x, y, w, h = rect_coords
+            cropped_image = self.image[y:y+h, x:x+w]
+
+            # Process the cropped image
+            max_contours = \
+                IP.process(cropped_image, 
+                    block_size=block_size, 
+                    gabor_ksize=gabor_ksize,
+                    theta=theta,
+                    lambd=lambd,
+                    blur_ksize=blur_ksize,
+                )
+
+            if max_contours is not None:
+                processed_image_ = cropped_image.copy()
+                cv2.drawContours(processed_image_, [max_contours], -1, (255, 0, 0), 3)
+                self.f_area = cv2.contourArea(max_contours)
+                self.processed_image[y:y+h, x:x+w] = processed_image_
+                cx, cy, cw, ch = cv2.boundingRect(max_contours)
+                text = f"Area: {int(self.f_area)} px"
+                cv2.putText(self.processed_image, text, (int(x + cx + 0.2*cw), y + cy),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        
+        else:
             print("No region selected")
-            return
         
-        # Get parameters from sliders
-        block_size = self.block_size_slider.value() * 2 + 1  # Make sure it's odd
-        c_value = self.c_value_slider.value()
-        threshold_sobel = self.sobel_slider.value()
-        threshold_hough = self.hough_slider.value()
-        minLineLength = self.min_line_length_slider.value()
-        maxLineGap = self.max_line_gap_slider.value()
-
-        x, y, w, h = rect_coords
-        cropped_image = self.image[y:y+h, x:x+w]
-
-        # Process the cropped image
-        cropped_processed_image = \
-            IP.process(cropped_image, 
-                block_size=block_size, 
-                c_value=c_value,
-                threshold_sobel=threshold_sobel,
-                threshold_hough=threshold_hough,
-                minLineLength=minLineLength,
-                maxLineGap=maxLineGap
-            )
-        
-        detected_circles = IP.detect_circles(
-            self.image[y:y+h, x:x+w],
-            dp=self.dp_slider.value(),
-            minRadius=self.min_radius_slider.value(),
-            maxRadius=self.max_radius_slider.value(),
-            param1=self.param1_slider.value(),
-            param2=self.param2_slider.value()
+        # Find circle
+        circles = IP.detect_circles(
+            self.image, 
+            minRadius=self.circle_min_radius_slider.value(),
+            maxRadius=self.circle_max_radius_slider.value(),
+            param2=self.circle_param2_slider.value()
         )
-        # Draw detected circles on the processed image
-        print(detected_circles)
-        if detected_circles is not None:
-            for (cx, cy, r) in detected_circles:
-                cv2.circle(cropped_processed_image, (int(cx), int(cy)), int(r), (0, 255, 0), 10)
+        if circles is not None:
+            for (x, y, r) in circles:
+                x, y, r = int(x), int(y), int(r)
+                cv2.circle(self.processed_image, (x, y), r, (0, 255, 0), 2)
+                cv2.circle(self.processed_image, (x, y), 2, (0, 255, 0), 3)
 
-        self.processed_image = self.image.copy()
-        self.processed_image[y:y+h, x:x+w] = cropped_processed_image
-        
-        # Display the processed image
+                # write the area (px) of the circle at the left top corner of the circle
+                self.c_area = np.pi * r**2
+                text = f"Area: {int(self.c_area)} px"
+                cv2.putText(self.processed_image, text, (int(x + 0.8*r), int(y - 0.8*r)), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
+        self.calculate_true_area()
         self.display_image(self.processed_image)
 
 
