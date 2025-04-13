@@ -1,6 +1,6 @@
-from PySide2.QtWidgets import QLabel, QSizePolicy
-from PySide2.QtGui import QPainter, QPen
-from PySide2.QtCore import Qt, QRect, Signal
+from PySide6.QtWidgets import QLabel, QSizePolicy
+from PySide6.QtGui import QPainter, QPen
+from PySide6.QtCore import Qt, QRect, Signal
 
 class RectangleSelector(QLabel):
     rectangle_updated = Signal()

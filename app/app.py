@@ -1,9 +1,9 @@
 import sys
 import cv2
 import numpy as np
-from PySide2.QtWidgets import *
-from PySide2.QtGui import QImage, QPixmap, QDoubleValidator
-from PySide2.QtCore import Qt, QTimer, Signal
+from PySide6.QtWidgets import *
+from PySide6.QtGui import QImage, QPixmap, QDoubleValidator
+from PySide6.QtCore import Qt, QTimer, Signal
 from components.RectangleSelector import RectangleSelector
 from components.ImageProcessor import ImageProcessor as IP
 
@@ -216,7 +216,7 @@ class ChatteringDetectionApp(QMainWindow):
             self.true_area_label.setText("Chattering Area: N/A")
             return None
 
-    def auto_process(self):
+    def auto_process(self, _=None):
         if self.image is not None:
             QTimer.singleShot(100, self.process_image)
 
@@ -293,4 +293,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ChatteringDetectionApp()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
