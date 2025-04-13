@@ -1,9 +1,9 @@
-from PyQt5.QtWidgets import QLabel, QSizePolicy
-from PyQt5.QtGui import QPainter, QPen
-from PyQt5.QtCore import Qt, QRect, pyqtSignal
+from PySide2.QtWidgets import QLabel, QSizePolicy
+from PySide2.QtGui import QPainter, QPen
+from PySide2.QtCore import Qt, QRect, Signal
 
 class RectangleSelector(QLabel):
-    rectangle_updated = pyqtSignal()
+    rectangle_updated = Signal()
     def __init__(self, parent=None):
         super().__init__(parent)
         self.start_point = None

@@ -1,18 +1,16 @@
 import sys
 import cv2
 import numpy as np
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtCore import Qt, QTimer
+from PySide2.QtWidgets import *
+from PySide2.QtGui import QImage, QPixmap, QDoubleValidator
+from PySide2.QtCore import Qt, QTimer, Signal
 from components.RectangleSelector import RectangleSelector
 from components.ImageProcessor import ImageProcessor as IP
 
-IP.imshow_disable = True  # Disable imshow in ImageProcessor
-
-class ImageProcessingApp(QMainWindow):
+class ChatteringDetectionApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Image Processing with ROI Selection")
+        self.setWindowTitle("Chattering Detection")
         self.setGeometry(100, 100, 1200, 800)
         
         # Initialize instance variables
@@ -25,8 +23,10 @@ class ImageProcessingApp(QMainWindow):
         self.focus_mask = None
         self.focus_image = None
         self.contours = None
+        self.f_area = None
+        self.c_area = None
 
-        self.circle_real_area = 6*6*np.pi  # mm^2
+        self.circle_real_area = 6.5*6.5/4*np.pi  # mm^2
         
         # Create the main layout
         main_layout = QHBoxLayout()
@@ -37,12 +37,12 @@ class ImageProcessingApp(QMainWindow):
         # Import button
         self.import_btn = QPushButton("Import Image")
         self.import_btn.clicked.connect(self.import_image)
-        left_panel.addWidget(self.import_btn)
+        left_panel.addWidget(self.import_btn, 1)
         
         # display the Chattering Area
         self.true_area_label = QLabel("Chattering Area: N/A")
         self.true_area_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        left_panel.addWidget(self.true_area_label)
+        left_panel.addWidget(self.true_area_label, 1)
 
         # Processing parameters
         self.create_parameter_controls(left_panel)
@@ -105,16 +105,17 @@ class ImageProcessingApp(QMainWindow):
             
             parent_layout.addWidget(slider)
             return slider
-                
+                       
         # Adaptive Threshold parameters
         threshold_group = QGroupBox("Adaptive Threshold")
         threshold_layout = QVBoxLayout()
         
         self.block_size_slider = add_slider(threshold_layout, "Block Size:", 
-                                           1, 25, 5, tick_interval=2)
+                           1, 25, 5, tick_interval=2)
         
         threshold_group.setLayout(threshold_layout)
-        layout.addWidget(threshold_group)
+        
+        layout.addWidget(threshold_group, 3)
 
         # Gabor Filter parameters
         gabor_group = QGroupBox("Gabor Filter")
@@ -128,7 +129,7 @@ class ImageProcessingApp(QMainWindow):
                                        5, 20, 10, tick_interval=1)
         
         gabor_group.setLayout(gabor_layout)
-        layout.addWidget(gabor_group)
+        layout.addWidget(gabor_group, 7)
 
         # Add blur parameters
         blur_group = QGroupBox("Blur")
@@ -137,11 +138,20 @@ class ImageProcessingApp(QMainWindow):
                                            1, 35, 15, tick_interval=2)
         
         blur_group.setLayout(blur_layout)
-        layout.addWidget(blur_group)
+        layout.addWidget(blur_group, 3)
 
         # Add circle detection parameters
         circle_detection_group = QGroupBox("Circle Detection")
         circle_detection_layout = QVBoxLayout()
+
+        real_area_layout = QHBoxLayout()
+        real_area_layout.addWidget(QLabel("Real Circle Area (mm^2):"))
+        self.real_area_input = QLineEdit(str(self.circle_real_area))
+        self.real_area_input.setValidator(QDoubleValidator())
+        self.real_area_input.textChanged.connect(self.update_real_circle_area)
+        real_area_layout.addWidget(self.real_area_input)
+        circle_detection_layout.addLayout(real_area_layout)
+        
         self.circle_min_radius_slider = add_slider(
             circle_detection_layout, "Minimum Circle Radius:", 
             1, 500, 50, tick_interval=10
@@ -152,10 +162,19 @@ class ImageProcessingApp(QMainWindow):
         )
         self.circle_param2_slider = add_slider(
             circle_detection_layout, "Detection Threshold:",
-            1, 300, 100, tick_interval=10
+            1, 300, 85, tick_interval=5
         )
+        
+        
         circle_detection_group.setLayout(circle_detection_layout)
-        layout.addWidget(circle_detection_group)
+        layout.addWidget(circle_detection_group, 8)
+        
+    def update_real_circle_area(self, text):
+        try:
+            self.circle_real_area = float(text)
+            self.calculate_true_area()
+        except ValueError:
+            pass  # Ignore invalid input
 
     def import_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.tif)")
@@ -272,6 +291,6 @@ class ImageProcessingApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = ImageProcessingApp()
+    window = ChatteringDetectionApp()
     window.show()
     sys.exit(app.exec_())
