@@ -106,20 +106,26 @@ class ImageProcessor:
         minRadius: int = 50,
         maxRadius: int = 300,
         param2: int = 100,
+        resize_factor: float = 0.5,
     ):
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (9, 9), 2)
-        edges = cv2.Canny(gray, 50, 150)
+        img = cv2.resize(img, (0, 0), fx=resize_factor, fy=resize_factor)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(16, 16))
+        img = clahe.apply(img)
+        img = cv2.GaussianBlur(img, (5, 5), 1.5, 1.5)
+        img = cv2.Canny(img, 100, 200, apertureSize=3)
+        img = cv2.dilate(img, np.ones((5, 5), np.uint8), iterations=2)
+        img = cv2.erode(img, np.ones((5, 5), np.uint8), iterations=2)
 
         circles = cv2.HoughCircles(
-            image=edges, method=cv2.HOUGH_GRADIENT, dp=1, minDist=2*minRadius, param1=100, 
+            image=img, method=cv2.HOUGH_GRADIENT, dp=1, minDist=2*minRadius, param1=100, 
             param2=param2, minRadius=minRadius, maxRadius=maxRadius
         )
 
         if circles is None:
             return None
         
-        return circles[0]
+        return circles[0] / resize_factor
 
 
 
