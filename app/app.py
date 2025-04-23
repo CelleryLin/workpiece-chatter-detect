@@ -27,6 +27,7 @@ class ChatteringDetectionApp(QMainWindow):
         self.c_area = None
 
         self.circle_real_area = 6.5*6.5/4*np.pi  # mm^2
+        self.width_resize_to_px = 1024 # px
         
         # Create the main layout
         main_layout = QHBoxLayout()
@@ -180,6 +181,8 @@ class ChatteringDetectionApp(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.tif)")
         if file_path:
             self.image = cv2.imread(file_path)
+            resize_ratio = int(self.image.shape[0] * self.width_resize_to_px / self.image.shape[1])
+            self.image = cv2.resize(self.image, (self.width_resize_to_px, resize_ratio))
             self.display_image(self.image)
             # Auto-process the image after importing
             self.auto_process()
