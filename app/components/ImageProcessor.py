@@ -35,7 +35,7 @@ class ImageProcessor:
         p_img = cv2.adaptiveThreshold(
             p_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, block_size, 0)
 
-        p_img = ImageProcessor.gabor_filter(p_img, ksize=gabor_ksize, sigma=0.1, theta=theta, lambd=lambd)
+        p_img = ImageProcessor.gabor_filter(p_img, ksize=gabor_ksize, sigma=0.3, theta=theta, lambd=lambd)
         p_img = ImageProcessor.blur(p_img, kernel_size=blur_ksize)
         p_img = ImageProcessor.post_binarize(p_img, threshold=post_binarize_th)
         p_img = ImageProcessor.morphological_transform(p_img, times=morph_times, kernel_size=morph_kernel_size)

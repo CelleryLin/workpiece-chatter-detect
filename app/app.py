@@ -141,6 +141,14 @@ class ChatteringDetectionApp(QMainWindow):
         blur_group.setLayout(blur_layout)
         layout.addWidget(blur_group, 3)
 
+        # Add post binarization parameters
+        post_binarize_group = QGroupBox("Post Binarization")
+        post_binarize_layout = QVBoxLayout()
+        self.post_binarize_slider = add_slider(post_binarize_layout, "Threshold:",
+                                                  0, 255, 130, tick_interval=1)
+        post_binarize_group.setLayout(post_binarize_layout)
+        layout.addWidget(post_binarize_group, 3)
+
         # Add circle detection parameters
         circle_detection_group = QGroupBox("Circle Detection")
         circle_detection_layout = QVBoxLayout()
@@ -241,6 +249,7 @@ class ChatteringDetectionApp(QMainWindow):
             theta = self.theta_slider.value()
             lambd = self.lambda_slider.value()
             blur_ksize = self.blur_ksize_slider.value() * 2 + 1
+            post_binarize_th = self.post_binarize_slider.value()
 
             x, y, w, h = rect_coords
             cropped_image = self.image[y:y+h, x:x+w]
@@ -253,6 +262,7 @@ class ChatteringDetectionApp(QMainWindow):
                     theta=theta,
                     lambd=lambd,
                     blur_ksize=blur_ksize,
+                    post_binarize_th=post_binarize_th,
                 )
 
             if max_contours is not None:

@@ -66,7 +66,7 @@ python main.py
 2. **Area Calculation**:
    - Detect reference circle in the image using Hough transform
    - Calculate the area of the detected chattering region in pixels
-   - Convert to real-world measurements using the known area of the reference circle (6mm diameter)
+   - Convert to real-world measurements using the known area of the reference circle (6.5mm diameter in default)
 
 ## Project Structure
 ```
@@ -74,13 +74,8 @@ workpiece-chattering-detection/
 ├── app/
 │   ├── components/
 │   │   ├── ImageProcessor.py
-│   │   ├── RectangleSelector.py
-│   │   ├── ThetaHistogramWindow.py
-│   │   └── _utils.py
+│   │   └── RectangleSelector.py
 │   └── app.py
-├── utils/
-│   ├── binarize.py
-│   └── find_focus.py
 ├── readme.md
 └── requirements.txt
 ```
